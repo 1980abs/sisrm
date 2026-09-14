@@ -7,212 +7,272 @@ from bs4 import BeautifulSoup
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
 
-st.set_page_config(page_title="Classificador de Afiliados", page_icon="📊", layout="wide")
-
-# --- FUNÇÃO DO ROBÔ QUE VAI LER OS LINKS ---
-def analisar_link(url):
-    # Se a célula estiver vazia ou não for um link válido
-    if pd.isna(url) or not str(url).startswith('http'):
-        return "Sem link válido", "Sem link"
-    
-    # Disfarça o robô do Python como se fosse um navegador comum (Chrome)
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
-    }
-    
-    try:
-        # Tenta acessar a página (espera no máximo 5 segundos para não travar o sistema)
-        resposta = requests.get(url, headers=headers, timeout=5)
-        
-        # Se a página permitir o acesso (Status 200 = OK)
-        if resposta.status_code == 200:
-            soup = BeautifulSoup(resposta.text, 'html.parser')
-            
-            # Tenta pegar o título da página para definir "O que é"
-            titulo = soup.title.string.strip() if soup.title else "Site Genérico"
-            
-            # Lógica simples para tentar achar seguidores (Aviso: redes sociais bloqueiam 99% das vezes)
-            texto_pagina = soup.get_text().lower()
-            if "instagram.com" in url:
-                return "Perfil Instagram", "Bloqueado para acesso (Proteção Anti-Robô)"
-            elif "tiktok.com" in url:
-                return "Perfil TikTok", "Bloqueado para acesso (Proteção Anti-Robô)"
-            elif "youtube.com" in url:
-                return "Canal YouTube", "Bloqueado para acesso (Proteção Anti-Robô)"
-            else:
-                return titulo[:50], "Não aplicável (Não é rede social)"
-        else:
-            return "Bloqueado para acesso", "Bloqueado para acesso"
-            
-    except Exception as e:
-        # Se der erro de conexão, timeout, etc.
-        return "Site fora do ar ou erro", "Bloqueado para acesso"
-
-# -------------------------------------------
+st.set_page_config(page_title="Sistema de Afiliados", page_icon="📊", layout="wide")
 
 if os.path.exists("logo.png"):
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.image("logo.png", use_container_width=True)
 
-st.title("📊 Classificador e Enriquecedor de Afiliados")
-st.write("Além de classificar as cores, o sistema agora lê os links da Coluna I da Base Principal para buscar dados.")
+st.title("📊 Gestor e Analista de Afiliados")
 
-col_main, col_test = st.columns(2)
+# --- CRIANDO AS ABAS INDEPENDENTES ---
+tab_comparador, tab_enriquecedor = st.tabs([
+    "🔀 1. Comparar Duplicados (Base Principal + Base Teste)", 
+    "🔍 2. Enriquecer Links (Apenas Base Principal)"
+])
 
-with col_main:
-    st.subheader("📂 1. Base Principal")
-    arquivo_principal = st.file_uploader("Envie a Base Principal", type=['xlsx', 'csv'], key="main")
+# ==============================================================================
+# FUNÇÕES DE ENRIQUECIMENTO DE LINKS (ABA 2)
+# ==============================================================================
 
-with col_test:
-    st.subheader("📂 2. Base Teste")
-    arquivo_teste = st.file_uploader("Envie a Base Teste", type=['xlsx', 'csv'], key="test")
+def identificar_tipo_trafego(url_str):
+    url = url_str.lower()
+    if "t.me" in url or "telegram" in url:
+        return "Telegram"
+    elif "instagram.com" in url or "instagr.am" in url:
+        return "Instagram"
+    elif "youtube.com" in url or "youtu.be" in url:
+        return "YouTube"
+    elif "wa.me" in url or "whatsapp.com" in url:
+        return "WhatsApp"
+    elif "tiktok.com" in url:
+        return "TikTok"
+    elif "facebook.com" in url or "fb.com" in url:
+        return "Facebook"
+    elif "kwai.com" in url:
+        return "Kwai"
+    elif "http" in url:
+        return "Site Próprio / Landing Page"
+    else:
+        return "Não Identificado"
 
-# Checkbox para o usuário decidir se quer fazer a busca demorada dos links
-buscar_links = st.checkbox("🔍 Ativar busca de 'O que é' e 'Seguidores' nos links da Base Principal (Isso pode demorar alguns minutos)")
+def identificar_segmentacao(texto_busca):
+    texto = texto_busca.lower()
+    
+    palavras_aposta = ["bet", "cassino", "aviator", "slots", "tigrinho", "fortune", "stake", "blaze", "poker", "aposta"]
+    palavras_financas = ["investimento", "trader", "acoes", "banco", "renda", "orcamento", "finance", "crypto", "bitcoin", "forex"]
+    palavras_educacao = ["curso", "mentoria", "aula", "ebook", "edtech", "concurso", "faculdade", "treinamento", "escola"]
+    palavras_saude = ["emagrecer", "treino", "diet", "saude", "whey", "keto", "fitness", "nutri", "estetica", "corpo"]
+    palavras_beleza = ["skin", "make", "unha", "cabelo", "maquiagem", "cilios", "sobrancelha", "skincare"]
+    
+    if any(p in texto for p in palavras_aposta):
+        return "APOSTA"
+    elif any(p in texto for p in palavras_financas):
+        return "FINANÇAS"
+    elif any(p in texto for p in palavras_educacao):
+        return "EDUCAÇÃO"
+    elif any(p in texto for p in palavras_saude):
+        return "SAÚDE / FITNESS"
+    elif any(p in texto for p in palavras_beleza):
+        return "BELEZA / ESTÉTICA"
+    else:
+        return "OUTROS / NÃO IDENTIFICADO"
 
-if arquivo_principal and arquivo_teste:
-    if st.button("🚀 Comparar, Classificar e Processar"):
+def analisar_link_completo(url):
+    if pd.isna(url) or not str(url).startswith('http'):
+        return "Não Identificado", "Sem Link Válido", "Não Identificado", "Sem Link"
+    
+    url_str = str(url).strip()
+    tipo_trafego = identificar_tipo_trafego(url_str)
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+    }
+    
+    try:
+        resposta = requests.get(url_str, headers=headers, timeout=5)
         
-        def carregar_dados(arquivo):
-            if arquivo.name.endswith('.csv'):
-                return pd.read_csv(arquivo)
-            return pd.read_excel(arquivo)
-
-        df_main = carregar_dados(arquivo_principal)
-        df_test = carregar_dados(arquivo_teste)
-
-        col_login_main = next((col for col in df_main.columns if str(col).strip().lower() == 'login'), None)
-        col_login_test = next((col for col in df_test.columns if str(col).strip().lower() == 'login'), None)
-
-        if not col_login_main or not col_login_test:
-            st.error("Erro: A coluna 'Login' não foi encontrada nas planilhas.")
+        if resposta.status_code == 200:
+            soup = BeautifulSoup(resposta.text, 'html.parser')
+            titulo = soup.title.string.strip() if soup.title else "Página Web"
+            
+            # Tenta pegar a meta descrição para melhorar a segmentação
+            meta_desc = ""
+            desc_tag = soup.find('meta', attrs={'name': 'description'})
+            if desc_tag and desc_tag.get('content'):
+                meta_desc = desc_tag['content']
+                
+            texto_completo = f"{url_str} {titulo} {meta_desc}"
+            segmentacao = identificar_segmentacao(texto_completo)
+            
+            # Redes sociais bloqueiam scrapers diretos
+            if tipo_trafego in ["Instagram", "TikTok", "YouTube", "Facebook", "Telegram"]:
+                qtd_seguidores = "Bloqueado para acesso"
+                o_que_e = f"Perfil/Canal de {tipo_trafego}"
+            else:
+                qtd_seguidores = "Não aplicável (Site Próprio)"
+                o_que_e = titulo[:60]
+                
+            return tipo_trafego, qtd_seguidores, segmentacao, o_que_e
         else:
-            with st.spinner('Cruzando as informações e aplicando cores...'):
-                logins_main = df_main[col_login_main].astype(str).str.strip().str.lower()
-                logins_test = df_test[col_login_test].astype(str).str.strip().str.lower()
+            segmentacao = identificar_segmentacao(url_str)
+            return tipo_trafego, "Bloqueado para acesso", segmentacao, "Bloqueado para acesso"
+            
+    except Exception:
+        segmentacao = identificar_segmentacao(url_str)
+        return tipo_trafego, "Bloqueado para acesso", segmentacao, "Site Indisponível / Erro"
 
-                contagem_main = logins_main.value_counts()
-                contagem_test = logins_test.value_counts()
+# ==============================================================================
+# ABA 1: COMPARADOR DE DUPLICADOS (Exige 2 arquivos)
+# ==============================================================================
 
-                status_list = []
-                cor_list = []
+with tab_comparador:
+    st.write("Compare a **Base Teste** contra a **Base Principal** para identificar duplicados e novos registros.")
+    
+    col_main, col_test = st.columns(2)
+    with col_main:
+        arq_principal = st.file_uploader("1. Envie a Base Principal", type=['xlsx', 'csv'], key="comp_main")
+    with col_test:
+        arq_teste = st.file_uploader("2. Envie a Base Teste", type=['xlsx', 'csv'], key="comp_test")
+        
+    if arq_principal and arq_teste:
+        if st.button("🚀 Comparar Duplicidades", key="btn_comparar"):
+            
+            def ler_arquivo(arq):
+                return pd.read_csv(arq) if arq.name.endswith('.csv') else pd.read_excel(arq)
 
-                for idx, row in df_test.iterrows():
-                    login_limpo = str(row[col_login_test]).strip().lower()
-                    qtd_na_principal = contagem_main.get(login_limpo, 0)
-                    qtd_na_teste = contagem_test.get(login_limpo, 0)
+            df_m = ler_arquivo(arq_principal)
+            df_t = ler_arquivo(arq_teste)
 
-                    if qtd_na_principal == 0:
-                        status_list.append("Novo (Não está na base principal)")
+            col_login_m = next((c for c in df_m.columns if str(c).strip().lower() == 'login'), None)
+            col_login_t = next((c for c in df_t.columns if str(c).strip().lower() == 'login'), None)
+
+            if not col_login_m or not col_login_t:
+                st.error("Erro: A coluna 'Login' precisa existir em ambas as planilhas.")
+            else:
+                logins_m = df_m[col_login_m].astype(str).str.strip().str.lower()
+                logins_t = df_t[col_login_t].astype(str).str.strip().str.lower()
+
+                cnt_m = logins_m.value_counts()
+                cnt_t = logins_t.value_counts()
+
+                status_list, cor_list = [], []
+
+                for _, row in df_t.iterrows():
+                    login_limpo = str(row[col_login_t]).strip().lower()
+                    qtd_p = cnt_m.get(login_limpo, 0)
+                    qtd_t = cnt_t.get(login_limpo, 0)
+
+                    if qtd_p == 0:
+                        status_list.append("Novo (Não existe na principal)")
                         cor_list.append("Laranja")
-                    elif qtd_na_principal > 0 and qtd_na_teste == 1:
-                        status_list.append("1 para 1 (Já existe, sem duplicidade)")
+                    elif qtd_p > 0 and qtd_t == 1:
+                        status_list.append("1 para 1 (Existe, sem duplicidade na teste)")
                         cor_list.append("Verde")
-                    elif qtd_na_principal > 0 and qtd_na_teste > 1:
+                    elif qtd_p > 0 and qtd_t > 1:
                         status_list.append("Duplicidade (Repetido na base teste)")
                         cor_list.append("Azul")
-                    else:
-                        status_list.append("Outro")
-                        cor_list.append("Branco")
 
-                df_resultado_teste = df_test.copy()
-                df_resultado_teste['Status_Analise'] = status_list 
-            
-            # --- NOVA PARTE: ANALISAR LINKS DA BASE PRINCIPAL ---
-            if buscar_links:
-                # A Coluna I no Excel é a 9ª coluna. No Python, a contagem começa do zero, então é o índice 8.
-                # Para evitar erros se a planilha for menor que 9 colunas, verificamos o tamanho:
-                if len(df_main.columns) >= 9:
-                    st.info("Iniciando a leitura dos links na Base Principal. Por favor, aguarde...")
-                    barra_progresso = st.progress(0)
-                    texto_progresso = st.empty()
-                    
-                    coluna_I = df_main.columns[8] # Pega o nome da coluna I dinamicamente
-                    
-                    lista_o_que_e = []
-                    lista_seguidores = []
-                    
-                    total_linhas = len(df_main)
-                    
-                    for index, link in enumerate(df_main[coluna_I]):
-                        # Atualiza a barra de progresso
-                        progresso = (index + 1) / total_linhas
-                        barra_progresso.progress(progresso)
-                        texto_progresso.text(f"Analisando link {index + 1} de {total_linhas}...")
-                        
-                        o_que_e, seguidores = analisar_link(link)
-                        lista_o_que_e.append(o_que_e)
-                        lista_seguidores.append(seguidores)
-                        
-                    # Adiciona as colunas novas na Base Principal
-                    df_main['O que é'] = lista_o_que_e
-                    df_main['Qtd Seguidores'] = lista_seguidores
-                    
-                    st.success("Leitura de links concluída!")
-                else:
-                    st.error("A Base Principal não tem 9 colunas (Coluna I) para fazer a leitura de links.")
-
-            # --- PARTE DO EXCEL (PINTAR AS CÉLULAS) ---
-            # Vamos gerar o arquivo da Base Teste colorida
-            buffer_teste = io.BytesIO()
-            df_resultado_teste.to_excel(buffer_teste, index=False, engine='openpyxl')
-            buffer_teste.seek(0)
-            
-            wb = load_workbook(buffer_teste)
-            ws = wb.active
-            
-            fundo_laranja = PatternFill(start_color="FF9900", end_color="FF9900", fill_type="solid")
-            fundo_verde = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
-            fundo_azul = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-            fonte_branca = Font(color="FFFFFF", bold=True)
-            fonte_preta = Font(color="000000", bold=True)
-            
-            idx_coluna_login = None
-            for idx, celula in enumerate(ws[1], start=1):
-                if celula.value == col_login_test:
-                    idx_coluna_login = idx
-                    break
-            
-            if idx_coluna_login:
-                for num_linha, cor in enumerate(cor_list, start=2):
-                    celula = ws.cell(row=num_linha, column=idx_coluna_login)
-                    if cor == "Laranja":
-                        celula.fill = fundo_laranja
-                        celula.font = fonte_preta
-                    elif cor == "Verde":
-                        celula.fill = fundo_verde
-                        celula.font = fonte_branca
-                    elif cor == "Azul":
-                        celula.fill = fundo_azul
-                        celula.font = fonte_branca
-            
-            buffer_final_teste = io.BytesIO()
-            wb.save(buffer_final_teste)
-            buffer_final_teste.seek(0)
-            
-            st.success("Processamento finalizado!")
-            
-            # Oferece os downloads
-            col_down1, col_down2 = st.columns(2)
-            
-            with col_down1:
+                df_res = df_t.copy()
+                df_res['Status_Analise'] = status_list
+                
+                buffer = io.BytesIO()
+                df_res.to_excel(buffer, index=False, engine='openpyxl')
+                buffer.seek(0)
+                
+                wb = load_workbook(buffer)
+                ws = wb.active
+                
+                f_laranja = PatternFill(start_color="FF9900", fill_type="solid")
+                f_verde = PatternFill(start_color="00B050", fill_type="solid")
+                f_azul = PatternFill(start_color="0070C0", fill_type="solid")
+                font_w = Font(color="FFFFFF", bold=True)
+                font_b = Font(color="000000", bold=True)
+                
+                idx_col = None
+                for idx, cel in enumerate(ws[1], start=1):
+                    if cel.value == col_login_t:
+                        idx_col = idx
+                        break
+                
+                if idx_col:
+                    for n_linha, cor in enumerate(cor_list, start=2):
+                        c = ws.cell(row=n_linha, column=idx_col)
+                        if cor == "Laranja":
+                            c.fill, c.font = f_laranja, font_b
+                        elif cor == "Verde":
+                            c.fill, c.font = f_verde, font_w
+                        elif cor == "Azul":
+                            c.fill, c.font = f_azul, font_w
+                
+                buf_final = io.BytesIO()
+                wb.save(buf_final)
+                buf_final.seek(0)
+                
+                st.success("Comparação concluída!")
                 st.download_button(
-                    label="📥 Baixar Base Teste (Colorida)",
-                    data=buffer_final_teste,
-                    file_name="Base_Teste_Colorida.xlsx",
+                    "📥 Baixar Base Teste Classificada",
+                    data=buf_final,
+                    file_name="Base_Teste_Classificada.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
+# ==============================================================================
+# ABA 2: ENRIQUECEDOR DE LINKS (Exige 1 arquivo)
+# ==============================================================================
+
+with tab_enriquecedor:
+    st.write("Envie apenas a **Base Principal** para varrer os links e preencher automaticamente as novas colunas.")
+    
+    arq_unico = st.file_uploader("Envie a Base Principal", type=['xlsx', 'csv'], key="enri_main")
+    
+    if arq_unico:
+        df_enri = pd.read_csv(arq_unico) if arq_unico.name.endswith('.csv') else pd.read_excel(arq_unico)
+        
+        st.subheader("Configuração das Colunas")
+        
+        # Seleção dinâmica de coluna (Opção B)
+        colunas_disponiveis = list(df_enri.columns)
+        
+        # Tenta pré-selecionar a Coluna I (índice 8) se existir
+        indice_padrao = 8 if len(colunas_disponiveis) >= 9 else 0
+        coluna_link_selecionada = st.selectbox(
+            "Selecione em qual coluna estão os links/redes sociais:", 
+            options=colunas_disponiveis, 
+            index=indice_padrao
+        )
+        
+        if st.button("🔍 Iniciar Enriquecimento dos Links"):
+            st.info("Varrendo os links. Aguarde o término do processamento...")
+            
+            barra = st.progress(0)
+            status_txt = st.empty()
+            
+            list_trafego = []
+            list_seguidores = []
+            list_segmentacao = []
+            list_o_que_e = []
+            
+            total = len(df_enri)
+            
+            for idx, link in enumerate(df_enri[coluna_link_selecionada]):
+                barra.progress((idx + 1) / total)
+                status_txt.text(f"Processando link {idx + 1} de {total}...")
                 
-            with col_down2:
-                if buscar_links and len(df_main.columns) >= 9:
-                    buffer_main = io.BytesIO()
-                    df_main.to_excel(buffer_main, index=False)
-                    buffer_main.seek(0)
-                    
-                    st.download_button(
-                        label="📥 Baixar Base Principal (Com novos dados)",
-                        data=buffer_main,
-                        file_name="Base_Principal_Enriquecida.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                trafego, seg, segm, oquee = analisar_link_completo(link)
+                
+                list_trafego.append(trafego)
+                list_seguidores.append(seg)
+                list_segmentacao.append(segm)
+                list_o_que_e.append(oquee)
+                
+            # Criando as 4 colunas solicitadas
+            df_enri['Tipo de Tráfego'] = list_trafego
+            df_enri['Qtd Seguidores'] = list_seguidores
+            df_enri['Segmentação'] = list_segmentacao
+            df_enri['O que é'] = list_o_que_e
+            
+            st.success("Enriquecimento de dados concluído!")
+            st.dataframe(df_enri[['Tipo de Tráfego', 'Qtd Seguidores', 'Segmentação', 'O que é']].head(10))
+            
+            buf_enri = io.BytesIO()
+            df_enri.to_excel(buf_enri, index=False)
+            buf_enri.seek(0)
+            
+            st.download_button(
+                "📥 Baixar Base Principal Enriquecida",
+                data=buf_enri,
+                file_name="Base_Principal_Enriquecida.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
