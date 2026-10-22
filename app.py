@@ -323,26 +323,25 @@ with tab_gigante:
 
         st.success("Tudo pronto! Pode descarregar os seus dois relatórios:")
 
-        # --- EXPORTAR BASE VÁLIDA (SEM PINTAR PARA POUPAR MEMÓRIA) ---
+        # --- EXPORTAR BASE VÁLIDA (Pequena - Excel) ---
         buf_final = io.BytesIO()
         df_final.to_excel(buf_final, index=False, engine='openpyxl')
         buf_final.seek(0)
 
         st.download_button(
-            label="✅ 1. Baixar Relatório com Links Classificados (9 Colunas)",
+            label="✅ 1. Baixar Relatório com Links Classificados (Excel)",
             data=buf_final, 
             file_name="1_Relatorio_Links_Classificados.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        # --- EXPORTAR BASE SEM LINKS (SEM PINTAR PARA POUPAR MEMÓRIA) ---
-        buf_erros = io.BytesIO()
-        df_sem_link.to_excel(buf_erros, index=False, engine='openpyxl')
-        buf_erros.seek(0)
+        # --- EXPORTAR BASE SEM LINKS (Gigante - CSV Leve) ---
+        # Usa separador ';' e utf-8-sig para abrir corretamente no Excel em português
+        csv_erros = df_sem_link.to_csv(index=False, sep=';', encoding='utf-8-sig')
 
         st.download_button(
-            label="⚠️ 2. Baixar Relatório de Contatos Pendentes (Sem Link)",
-            data=buf_erros, 
-            file_name="2_Relatorio_Para_Contatar_Sem_Link.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            label="⚠️ 2. Baixar Contatos Pendentes (CSV Rápido)",
+            data=csv_erros, 
+            file_name="2_Relatorio_Para_Contatar_Sem_Link.csv",
+            mime="text/csv"
         )
