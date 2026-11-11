@@ -45,21 +45,25 @@ def identificar_tipo_trafego(url_str):
 
 
 def identificar_segmentacao(texto_busca):
+  # O uso de \b (word boundary) garante que ele procure a palavra EXATA. 
+  # Assim "aula" não vai ser ativado se o link for "paula".
   texto = str(texto_busca).lower()
-  if re.search(r'bet|cassino|aviator|slots|tigrinho|fortune|stake|blaze|poker|aposta', texto): return "APOSTA"
-  elif re.search(r'invest|trader|acoes|banco|renda|orcamento|finance|crypto|bitcoin|forex', texto): return "FINANÇAS"
-  elif re.search(r'curso|mentoria|aula|ebook|edtech|concurso|faculdade|treinamento|escola', texto): return "EDUCAÇÃO"
-  elif re.search(r'emagrecer|treino|diet|saude|whey|keto|fitness|nutri|estetica|corpo', texto): return "SAÚDE / FITNESS"
-  elif re.search(r'skin|make|unha|cabelo|maquiagem|cilios|sobrancelha|skincare', texto): return "BELEZA / ESTÉTICA"
-  elif re.search(r'cupom|promo|desconto|oferta', texto): return "CUPOM / OFERTAS"
-  elif re.search(r'achado|achadinho', texto): return "ACHADINHOS"
-  elif re.search(r'shopee|amazon|magalu|aliexpress', texto): return "E-COMMERCE"
-  else: return "OUTROS / NÃO IDENTIFICADO"
+  
+  if re.search(r'\b(bet|cassino|aviator|slots|tigrinho|fortune|stake|blaze|poker|aposta|apostas)\b', texto): return "APOSTA"
+  elif re.search(r'\b(investimento|investir|trader|acoes|ações|banco|renda|orcamento|finanças|finance|crypto|bitcoin|forex)\b', texto): return "FINANÇAS"
+  elif re.search(r'\b(curso|cursos|mentoria|aula|aulas|ebook|edtech|concurso|faculdade|treinamento|escola)\b', texto): return "EDUCAÇÃO"
+  elif re.search(r'\b(viagem|viajar|turismo|passagem|hospedagem|hotel|milhas)\b', texto): return "VIAGEM"
+  elif re.search(r'\b(emagrecer|treino|dieta|diet|saude|saúde|whey|keto|fitness|nutri|estetica|estética|corpo)\b', texto): return "SAÚDE / FITNESS"
+  elif re.search(r'\b(skin|make|unha|cabelo|maquiagem|cilios|sobrancelha|skincare)\b', texto): return "BELEZA / ESTÉTICA"
+  elif re.search(r'\b(cupom|cupons|promo|promoção|promocao|desconto|oferta|ofertas)\b', texto): return "CUPOM / OFERTAS"
+  elif re.search(r'\b(achado|achadinho|achados|achadinhos)\b', texto): return "ACHADINHOS"
+  elif re.search(r'\b(shopee|amazon|magalu|aliexpress|ecommerce)\b', texto): return "E-COMMERCE"
+  else: return "NÃO IDENTIFICADO"
 
 
 def analisar_link_completo(url):
   if pd.isna(url) or not str(url).startswith("http"):
-    return "Não Identificado", "Sem Link Válido", "Não Identificado", "Sem Link"
+    return "Não Identificado", "Sem Link Válido", "NÃO IDENTIFICADO", "Sem Link"
 
   url_str = str(url).strip()
   tipo_trafego = identificar_tipo_trafego(url_str)
@@ -76,12 +80,13 @@ def analisar_link_completo(url):
       if desc_tag and desc_tag.get("content"):
         meta_desc = desc_tag["content"]
 
+      # Junta tudo para a IA analisar o contexto geral da página
       texto_completo = f"{url_str} {titulo} {meta_desc}"
       segmentacao = identificar_segmentacao(texto_completo)
 
       if tipo_trafego in ["Instagram", "TikTok", "YouTube", "Facebook", "Telegram"]:
-        qtd_seguidores = "Bloqueado para acesso"
-        o_que_e = f"Perfil/Canal de {tipo_trafego}"
+        qtd_seguidores = "Bloqueado para acesso (Página Privada)"
+        o_que_e = f"Perfil/Canal de {tipo_trafego}" if segmentacao == "NÃO IDENTIFICADO" else f"Canal de {tipo_trafego} focado em {segmentacao.title()}"
       else:
         qtd_seguidores = "Não aplicável (Site Próprio)"
         o_que_e = titulo[:60]
@@ -89,32 +94,14 @@ def analisar_link_completo(url):
       return tipo_trafego, qtd_seguidores, segmentacao, o_que_e
     else:
       segmentacao = identificar_segmentacao(url_str)
-      return tipo_trafego, "Bloqueado para acesso", segmentacao, "Bloqueado para acesso"
+      return tipo_trafego, "Acesso Restrito", segmentacao, "Página não acessível"
   except Exception:
     segmentacao = identificar_segmentacao(url_str)
-    return tipo_trafego, "Bloqueado para acesso", segmentacao, "Site Indisponível / Erro"
-
-
-def analisar_link_rapido(url):
-  if pd.isna(url) or not str(url).startswith("http"):
-    return "Não Identificado", "Sem Link Válido", "Não Identificado", "Sem Link"
-
-  url_str = str(url).strip()
-  tipo_trafego = identificar_tipo_trafego(url_str)
-  segmentacao = identificar_segmentacao(url_str)
-
-  if tipo_trafego in ["Site Próprio / Landing Page", "Não Identificado", "E-Commerce"]:
-    oquee = f"Página Web focada em {segmentacao.title()}"
-    seguidores = "NÃO APLICÁVEL (SITE)"
-  else:
-    oquee = f"Canal de {tipo_trafego.title()} focado em {segmentacao.title()}"
-    seguidores = "PÁGINA PRIVADA / REQUER API"
-
-  return tipo_trafego, seguidores, segmentacao, oquee
+    return tipo_trafego, "Erro de Conexão", segmentacao, "Site Indisponível / Erro"
 
 
 # ==============================================================================
-# ABA 1: COMPARADOR DE DUPLICADOS (Baseadas em 2 arquivos)
+# ABA 1: COMPARADOR DE DUPLICADOS
 # ==============================================================================
 with tab_comparador:
   st.write("Compare a **Base Teste** contra a **Base Principal** para identificar duplicados.")
@@ -268,80 +255,84 @@ with tab_enriquecedor:
 
 
 # ==============================================================================
-# ABA 3: RELATÓRIO AVANÇADO (BASE GIGANTE - OTIMIZADA PARA MEMÓRIA)
+# ABA 3: RELATÓRIO AVANÇADO (BASE GIGANTE - AGORA COM SCRAPING COMPLETO E EXATO)
 # ==============================================================================
 with tab_gigante:
   st.header("Processador de Bases Gigantes")
-  st.write("1. Une todas as abas, analisa os links e cria as 4 colunas (Segmento, Categoria, Descrição, Seguidores).")
+  st.write("1. Une todas as abas, **ACESSA A INTERNET**, lê os links e classifica com Palavras Exatas.")
   st.write("2. Gera **DOIS** relatórios formatados: um com links classificados e outro com os sem link (para contato).")
 
   arq_gigante = st.file_uploader("Envie a Base Completa (.xlsx)", type=["xlsx"], key="u_gigante")
 
   if arq_gigante:
-    if st.button("🚀 Processar Base e Gerar Relatórios"):
-      with st.spinner("A ler abas e a classificar... isto pode demorar 1-2 minutos."):
+    if st.button("🚀 Iniciar Processamento Profundo (Scraping)"):
+      
+      status_leitura = st.info("A ler e juntar as 50+ abas. Aguarde...")
+      
+      todas_as_abas = pd.read_excel(arq_gigante, sheet_name=None)
+      lista_df = []
+      for nome_aba, df_aba in todas_as_abas.items():
+        df_aba["Mes_Origem (Aba)"] = nome_aba
+        lista_df.append(df_aba)
+
+      df_completo = pd.concat(lista_df, ignore_index=True)
+      df_completo = df_completo.dropna(how='all')
+      
+      col_fonte = next((c for c in df_completo.columns if 'fonte' in str(c).lower()), df_completo.columns[4])
+      df_completo[col_fonte] = df_completo[col_fonte].astype(str).str.strip()
+
+      termos_excluir = ["erro", "sem link", "não cadastrada", "nao cadastrada", "-", "nan", "", "nenhuma", "null"]
+      mascara_lixo = df_completo[col_fonte].str.lower().isin(termos_excluir)
+      mascara_sem_http = ~df_completo[col_fonte].str.contains("http|www|\.com|\.br|@", case=False, na=False)
+
+      df_sem_link = df_completo[mascara_lixo | mascara_sem_http].copy()
+      df_limpo = df_completo[~(mascara_lixo | mascara_sem_http)].copy()
+      
+      status_leitura.empty()
+      st.info(f"Leitura das abas concluída! Vamos visitar {len(df_limpo)} links válidos na internet. (Os {len(df_sem_link)} registos sem link foram separados).")
+
+      list_trafego, list_seguidores, list_segmentacao, list_oquee = [], [], [], []
+      
+      barra_progresso = st.progress(0)
+      texto_progresso = st.empty()
+      total_validos = len(df_limpo)
+
+      for idx, link in enumerate(df_limpo[col_fonte]):
+        barra_progresso.progress((idx + 1) / total_validos)
+        texto_progresso.text(f"A visitar e classificar o link {idx + 1} de {total_validos}... (Isto pode demorar)")
+
+        trafego, seg, segm, oquee = analisar_link_completo(link)
         
-        todas_as_abas = pd.read_excel(arq_gigante, sheet_name=None)
-        lista_df = []
-        for nome_aba, df_aba in todas_as_abas.items():
-          df_aba["Mes_Origem (Aba)"] = nome_aba
-          lista_df.append(df_aba)
+        list_trafego.append(trafego)
+        list_seguidores.append(seg)
+        list_segmentacao.append(segm)
+        list_oquee.append(oquee)
 
-        df_completo = pd.concat(lista_df, ignore_index=True)
-        df_completo = df_completo.dropna(how='all')
-        
-        col_fonte = next((c for c in df_completo.columns if 'fonte' in str(c).lower()), df_completo.columns[4])
-        df_completo[col_fonte] = df_completo[col_fonte].astype(str).str.strip()
+      df_limpo["Segmento"] = list_segmentacao
+      df_limpo["Categoria"] = list_trafego
+      df_limpo["Breve Descrição"] = list_oquee
+      df_limpo["Qtd Seguidores"] = list_seguidores
 
-        termos_excluir = ["erro", "sem link", "não cadastrada", "nao cadastrada", "-", "nan", "", "nenhuma", "null"]
-        mascara_lixo = df_completo[col_fonte].str.lower().isin(termos_excluir)
-        mascara_sem_http = ~df_completo[col_fonte].str.contains("http|www|\.com|\.br|@", case=False, na=False)
+      df_final = df_limpo.sort_values(by=["Segmento", "Categoria"], ascending=True)
 
-        # Base 2: Sem Link / Erros
-        df_sem_link = df_completo[mascara_lixo | mascara_sem_http].copy()
-        
-        # Base 1: Com Links Válidos
-        df_limpo = df_completo[~(mascara_lixo | mascara_sem_http)].copy()
+      st.success("🎉 Processamento Profundo concluído com sucesso! Pode descarregar os seus relatórios:")
 
-        st.info(f"Análise: {len(df_limpo)} links válidos e {len(df_sem_link)} registos sem link para contactar.")
+      buf_final = io.BytesIO()
+      df_final.to_excel(buf_final, index=False, engine='openpyxl')
+      buf_final.seek(0)
 
-        list_trafego, list_seguidores, list_segmentacao, list_oquee = [], [], [], []
+      st.download_button(
+          label="✅ 1. Baixar Relatório com Links Classificados (Excel)",
+          data=buf_final, 
+          file_name="1_Relatorio_Links_Classificados_Profundo.xlsx",
+          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      )
 
-        for link in df_limpo[col_fonte]:
-          trafego, seg, segm, oquee = analisar_link_rapido(link)
-          list_trafego.append(trafego)
-          list_seguidores.append(seg)
-          list_segmentacao.append(segm)
-          list_oquee.append(oquee)
+      csv_erros = df_sem_link.to_csv(index=False, sep=';', encoding='utf-8-sig')
 
-        df_limpo["Segmento"] = list_segmentacao
-        df_limpo["Categoria"] = list_trafego
-        df_limpo["Breve Descrição"] = list_oquee
-        df_limpo["Qtd Seguidores"] = list_seguidores
-
-        df_final = df_limpo.sort_values(by=["Segmento", "Categoria"], ascending=True)
-
-        st.success("Tudo pronto! Pode descarregar os seus dois relatórios:")
-
-        # --- EXPORTAR BASE VÁLIDA (Pequena - Excel) ---
-        buf_final = io.BytesIO()
-        df_final.to_excel(buf_final, index=False, engine='openpyxl')
-        buf_final.seek(0)
-
-        st.download_button(
-            label="✅ 1. Baixar Relatório com Links Classificados (Excel)",
-            data=buf_final, 
-            file_name="1_Relatorio_Links_Classificados.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-        # --- EXPORTAR BASE SEM LINKS (Gigante - CSV Leve) ---
-        # Usa separador ';' e utf-8-sig para abrir corretamente no Excel em português
-        csv_erros = df_sem_link.to_csv(index=False, sep=';', encoding='utf-8-sig')
-
-        st.download_button(
-            label="⚠️ 2. Baixar Contatos Pendentes (CSV Rápido)",
-            data=csv_erros, 
-            file_name="2_Relatorio_Para_Contatar_Sem_Link.csv",
-            mime="text/csv"
-        )
+      st.download_button(
+          label="⚠️ 2. Baixar Contatos Pendentes (CSV Rápido)",
+          data=csv_erros, 
+          file_name="2_Relatorio_Para_Contatar_Sem_Link.csv",
+          mime="text/csv"
+      )
