@@ -253,27 +253,38 @@ with tab_copia_cola:
   st.header("Processador Rápido (Copiar e Colar)")
   st.write("Copie as colunas diretamente da sua planilha (ex: coluna de Nomes e coluna de Links) e cole no quadro abaixo.")
   
-  dados_colados = st.text_area("Cole os dados aqui (pode colar múltiplas colunas):", height=250)
+  # Sistema para limpar o texto de forma fácil
+  if 'texto_colado' not in st.session_state:
+      st.session_state.texto_colado = ''
 
-  if st.button("🚀 Processar Dados Colados"):
+  def limpar_texto():
+      st.session_state.texto_colado = ''
+
+  dados_colados = st.text_area("Cole os dados aqui (pode colar múltiplas colunas):", key='texto_colado', height=250)
+
+  col_acao1, col_acao2 = st.columns([1, 1])
+  with col_acao1:
+      btn_processar = st.button("🚀 Processar Dados Colados")
+  with col_acao2:
+      st.button("🗑️ Limpar Dados", on_click=limpar_texto)
+
+  if btn_processar:
     if not dados_colados.strip():
         st.warning("Por favor, cole alguns dados no quadro antes de processar.")
     else:
-        # Lê os dados colados do Excel (que usa tabulações para separar as colunas)
         try:
+            # Lê os dados
             df_colado = pd.read_csv(io.StringIO(dados_colados), sep='\t', header=None)
             
-            # Tenta encontrar automaticamente qual coluna contém os links "http"
+            # Encontra a coluna dos links
             col_fonte = None
             for col in df_colado.columns:
                 if df_colado[col].astype(str).str.contains("http", case=False, na=False).any():
                     col_fonte = col
                     break
-            
             if col_fonte is None:
-                col_fonte = df_colado.columns[-1] # Se não achar, assume a última coluna
+                col_fonte = df_colado.columns[-1] 
             
-            # Adiciona nomes genéricos às colunas para o Excel final ficar bonito
             novos_nomes = [f"Coluna {i+1}" for i in range(len(df_colado.columns))]
             novos_nomes[col_fonte] = "Link (Fonte)"
             df_colado.columns = novos_nomes
@@ -298,7 +309,6 @@ with tab_copia_cola:
                 if total_validos > 0: barra_progresso.progress((idx + 1) / total_validos)
                 texto_progresso.text(f"A analisar o link {idx + 1} de {total_validos}...")
                 
-                # Executa a mesma inteligência da Aba 3
                 t, s, sm, oq = analisar_link_completo(link)
                 list_t.append(t); list_seg.append(s); list_segm.append(sm); list_oq.append(oq)
 
@@ -308,20 +318,19 @@ with tab_copia_cola:
                 df_limpo["Breve Descrição"] = list_oq
                 df_limpo["Qtd Seguidores"] = list_seg
 
-            df_final = df_limpo.sort_values(by=["Segmento", "Categoria"], ascending=True) if total_validos > 0 else df_limpo
+            # REMOVIDO: A ordenação alfabética que estava a bagunçar a ordem dela
+            df_final = df_limpo 
             
             st.success("🎉 Processamento dos dados colados concluído!")
 
             col_btn1, col_btn2 = st.columns(2)
             
-            # --- EXPORTAR BASE VÁLIDA ---
             buf_final = io.BytesIO()
             df_final.to_excel(buf_final, index=False, engine='openpyxl')
             buf_final.seek(0)
             with col_btn1:
                 st.download_button("✅ 1. Baixar Classificados (Excel)", data=buf_final, file_name="CopiaCola_Classificados.xlsx")
 
-            # --- EXPORTAR BASE SEM LINKS ---
             csv_erros = df_sem_link.to_csv(index=False, sep=';', encoding='utf-8-sig')
             with col_btn2:
                 st.download_button("⚠️ 2. Baixar Contatos Pendentes (CSV)", data=csv_erros, file_name="CopiaCola_Sem_Link.csv", mime="text/csv")
