@@ -48,18 +48,16 @@ def identificar_tipo_trafego(url_str):
 def identificar_segmentacao(texto_busca):
   texto = str(texto_busca).lower()
   
-  # INTELIGÊNCIA HÍBRIDA: 
-  # \b(...) -> Exige palavra exata isolada (evita confundir Paula com Aula)
-  # | (...) -> Aceita a palavra mesmo colada em links (ex: unhasdegel, supertrader)
-  
+  # CORREÇÃO: "ebook" movido para a zona das palavras restritas (\b) para não confundir com facEBOOK
+  # CORREÇÃO: "achado" movido para as restritas para não confundir com mACHADO
   if re.search(r'\b(bet|aposta|apostas)\b|(cassino|aviator|slots|tigrinho|fortune|stake|blaze|poker)', texto): return "APOSTA"
   elif re.search(r'\b(banco|renda|ações|acoes|orcamento)\b|(investimento|investir|trader|finanças|finance|crypto|bitcoin|forex)', texto): return "FINANÇAS"
-  elif re.search(r'\b(aula|aulas|curso|cursos|escola)\b|(mentoria|ebook|edtech|concurso|faculdade|treinamento)', texto): return "EDUCAÇÃO"
+  elif re.search(r'\b(aula|aulas|curso|cursos|escola|ebook)\b|(mentoria|edtech|concurso|faculdade|treinamento)', texto): return "EDUCAÇÃO"
   elif re.search(r'\b(hotel|milhas)\b|(viagem|viajar|turismo|passagem|hospedagem)', texto): return "VIAGEM"
   elif re.search(r'\b(diet|corpo|saude|saúde)\b|(emagrecer|treino|dieta|whey|keto|fitness|nutri|estetica|estética)', texto): return "SAÚDE / FITNESS"
   elif re.search(r'\b(skin|make)\b|(unha|cabelo|maquiagem|cilios|sobrancelha|skincare|penteado|manicure|pedicure|esteticista)', texto): return "BELEZA / ESTÉTICA"
   elif re.search(r'\b(cupom|cupons|promo|oferta|ofertas)\b|(promoção|promocao|desconto)', texto): return "CUPOM / OFERTAS"
-  elif re.search(r'(achado|achadinho|achados|achadinhos)', texto): return "ACHADINHOS"
+  elif re.search(r'\b(achado|achadinho|achados|achadinhos)\b', texto): return "ACHADINHOS"
   elif re.search(r'(shopee|amazon|magalu|aliexpress|ecommerce)', texto): return "E-COMMERCE"
   else: return "NÃO IDENTIFICADO"
 
