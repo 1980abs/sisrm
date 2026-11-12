@@ -47,15 +47,20 @@ def identificar_tipo_trafego(url_str):
 
 def identificar_segmentacao(texto_busca):
   texto = str(texto_busca).lower()
-  if re.search(r'\b(bet|cassino|aviator|slots|tigrinho|fortune|stake|blaze|poker|aposta|apostas)\b', texto): return "APOSTA"
-  elif re.search(r'\b(investimento|investir|trader|acoes|ações|banco|renda|orcamento|finanças|finance|crypto|bitcoin|forex)\b', texto): return "FINANÇAS"
-  elif re.search(r'\b(curso|cursos|mentoria|aula|aulas|ebook|edtech|concurso|faculdade|treinamento|escola)\b', texto): return "EDUCAÇÃO"
-  elif re.search(r'\b(viagem|viajar|turismo|passagem|hospedagem|hotel|milhas)\b', texto): return "VIAGEM"
-  elif re.search(r'\b(emagrecer|treino|dieta|diet|saude|saúde|whey|keto|fitness|nutri|estetica|estética|corpo)\b', texto): return "SAÚDE / FITNESS"
-  elif re.search(r'\b(skin|make|unha|cabelo|maquiagem|cilios|sobrancelha|skincare)\b', texto): return "BELEZA / ESTÉTICA"
-  elif re.search(r'\b(cupom|cupons|promo|promoção|promocao|desconto|oferta|ofertas)\b', texto): return "CUPOM / OFERTAS"
-  elif re.search(r'\b(achado|achadinho|achados|achadinhos)\b', texto): return "ACHADINHOS"
-  elif re.search(r'\b(shopee|amazon|magalu|aliexpress|ecommerce)\b', texto): return "E-COMMERCE"
+  
+  # INTELIGÊNCIA HÍBRIDA: 
+  # \b(...) -> Exige palavra exata isolada (evita confundir Paula com Aula)
+  # | (...) -> Aceita a palavra mesmo colada em links (ex: unhasdegel, supertrader)
+  
+  if re.search(r'\b(bet|aposta|apostas)\b|(cassino|aviator|slots|tigrinho|fortune|stake|blaze|poker)', texto): return "APOSTA"
+  elif re.search(r'\b(banco|renda|ações|acoes|orcamento)\b|(investimento|investir|trader|finanças|finance|crypto|bitcoin|forex)', texto): return "FINANÇAS"
+  elif re.search(r'\b(aula|aulas|curso|cursos|escola)\b|(mentoria|ebook|edtech|concurso|faculdade|treinamento)', texto): return "EDUCAÇÃO"
+  elif re.search(r'\b(hotel|milhas)\b|(viagem|viajar|turismo|passagem|hospedagem)', texto): return "VIAGEM"
+  elif re.search(r'\b(diet|corpo|saude|saúde)\b|(emagrecer|treino|dieta|whey|keto|fitness|nutri|estetica|estética)', texto): return "SAÚDE / FITNESS"
+  elif re.search(r'\b(skin|make)\b|(unha|cabelo|maquiagem|cilios|sobrancelha|skincare|penteado|manicure|pedicure|esteticista)', texto): return "BELEZA / ESTÉTICA"
+  elif re.search(r'\b(cupom|cupons|promo|oferta|ofertas)\b|(promoção|promocao|desconto)', texto): return "CUPOM / OFERTAS"
+  elif re.search(r'(achado|achadinho|achados|achadinhos)', texto): return "ACHADINHOS"
+  elif re.search(r'(shopee|amazon|magalu|aliexpress|ecommerce)', texto): return "E-COMMERCE"
   else: return "NÃO IDENTIFICADO"
 
 
@@ -253,7 +258,6 @@ with tab_copia_cola:
   st.header("Processador Rápido (Copiar e Colar)")
   st.write("Copie as colunas diretamente da sua planilha (ex: coluna de Nomes e coluna de Links) e cole no quadro abaixo.")
   
-  # Sistema para limpar o texto de forma fácil
   if 'texto_colado' not in st.session_state:
       st.session_state.texto_colado = ''
 
@@ -273,10 +277,8 @@ with tab_copia_cola:
         st.warning("Por favor, cole alguns dados no quadro antes de processar.")
     else:
         try:
-            # Lê os dados
             df_colado = pd.read_csv(io.StringIO(dados_colados), sep='\t', header=None)
             
-            # Encontra a coluna dos links
             col_fonte = None
             for col in df_colado.columns:
                 if df_colado[col].astype(str).str.contains("http", case=False, na=False).any():
@@ -318,7 +320,6 @@ with tab_copia_cola:
                 df_limpo["Breve Descrição"] = list_oq
                 df_limpo["Qtd Seguidores"] = list_seg
 
-            # REMOVIDO: A ordenação alfabética que estava a bagunçar a ordem dela
             df_final = df_limpo 
             
             st.success("🎉 Processamento dos dados colados concluído!")
