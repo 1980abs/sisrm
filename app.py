@@ -40,7 +40,7 @@ def identificar_tipo_trafego(url_str):
   elif 'tiktok.com' in url: return "TikTok"
   elif any(x in url for x in ['facebook.com', 'fb.com']): return "Facebook"
   elif 'kwai.com' in url: return "Kwai"
-  elif any(x in url for x in ['shopee', 'amazon', 'aliexpress', 'magalu']): return "E-Commerce"
+  elif any(x in url for x in ['shopee', 'amazon', 'aliexpress', 'magalu', 'havan', 'mercadolivre']): return "E-Commerce"
   elif 'http' in url: return "Site Próprio / Landing Page"
   else: return "Não Identificado"
 
@@ -48,8 +48,6 @@ def identificar_tipo_trafego(url_str):
 def identificar_segmentacao(texto_busca):
   texto = str(texto_busca).lower()
   
-  # CORREÇÃO: "ebook" movido para a zona das palavras restritas (\b) para não confundir com facEBOOK
-  # CORREÇÃO: "achado" movido para as restritas para não confundir com mACHADO
   if re.search(r'\b(bet|aposta|apostas)\b|(cassino|aviator|slots|tigrinho|fortune|stake|blaze|poker)', texto): return "APOSTA"
   elif re.search(r'\b(banco|renda|ações|acoes|orcamento)\b|(investimento|investir|trader|finanças|finance|crypto|bitcoin|forex)', texto): return "FINANÇAS"
   elif re.search(r'\b(aula|aulas|curso|cursos|escola|ebook)\b|(mentoria|edtech|concurso|faculdade|treinamento)', texto): return "EDUCAÇÃO"
@@ -58,7 +56,7 @@ def identificar_segmentacao(texto_busca):
   elif re.search(r'\b(skin|make)\b|(unha|cabelo|maquiagem|cilios|sobrancelha|skincare|penteado|manicure|pedicure|esteticista)', texto): return "BELEZA / ESTÉTICA"
   elif re.search(r'\b(cupom|cupons|promo|oferta|ofertas)\b|(promoção|promocao|desconto)', texto): return "CUPOM / OFERTAS"
   elif re.search(r'\b(achado|achadinho|achados|achadinhos)\b', texto): return "ACHADINHOS"
-  elif re.search(r'(shopee|amazon|magalu|aliexpress|ecommerce)', texto): return "E-COMMERCE"
+  elif re.search(r'(shopee|amazon|magalu|aliexpress|ecommerce|havan|mercadolivre|loja|notebook|celular|smartphone|eletronico|televisao|produto)', texto): return "E-COMMERCE"
   else: return "NÃO IDENTIFICADO"
 
 
@@ -68,7 +66,7 @@ def analisar_link_completo(url):
 
   url_str = str(url).strip()
   tipo_trafego = identificar_tipo_trafego(url_str)
-  headers = {"User-Agent": "Mozilla/5.0"}
+  headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
   try:
     resposta = requests.get(url_str, headers=headers, timeout=5)
